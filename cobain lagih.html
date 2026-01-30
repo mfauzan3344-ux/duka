@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Absensi QR</title>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #121212; color: white; text-align: center; padding: 20px; }
+        #reader { width: 100%; max-width: 450px; margin: auto; border: 2px solid #3498db; border-radius: 10px; overflow: hidden; background: black; }
+        #result { margin-top: 20px; padding: 15px; border-radius: 5px; font-weight: bold; min-height: 50px; transition: 0.3s; }
+        .scanning { background: #2980b9; }
+        .success { background: #27ae60; }
+        .error { background: #c0392b; }
+        .processing { background: #f39c12; }
+    </style>
+</head>
+<body>
+
+    <h2>Scan QR Kehadiran</h2>
+    <div id="reader"></div>
+    <div id="result" class="scanning">Siap Memindai...</div>
+
+    <script>
+        // PASTIKAN URL SUDAH BENAR DAN DIPUBLISH SEBAGAI 'ANYONE'
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwPUZ5AEqzS-KmrPtUZ-iV5QSqvydDiF05RbIb38MAwqhLDOvqKobmPMlrR3LSQp6Kq/exec"; 
+        let isProcessing = false;
+
+        function onScanSuccess(decodedText) {
+            if (isProcessing) return;
+            isProcessing = true;
+            
+            const resultDiv = document.getElementById("result");
+            const dataArray = decodedText.split(",");
+            const payload = { 
+                id: dataArray[0] ? dataArray[0].trim() : "N/A", 
+                nama: dataArray[1] ? dataArray[1].trim() : "User" 
+            };
+
+            resultDiv.className = "processing";
+            resultDiv.innerHTML = `Mengirim data: ${payload.nama}...`;
+
+            // Gunakan URLSearchParams agar data mudah dibaca oleh Apps Script (doPost)
+            // Atau tetap JSON tapi hapus mode: no-cors
+            fetch(SCRIPT_URL, {
+                method: "POST",
+                mode: "cors", // Ubah ke cors agar bisa menerima feedback
+                headers: {
+                    "Content-Type": "text/plain;charset=utf-8", // Trik agar tidak kena preflight CORS
+                },
+                body: JSON.stringify(payload)
+            })
+            .then(res => {
+                resultDiv.className = "success";
+                resultDiv.innerHTML = `✅ BERHASIL: ${payload.nama}`;
+                resetScanner();
+            })
+            .catch(err => {
+                console.error(err);
+                resultDiv.className = "error";
+                resultDiv.innerHTML = "❌ Gagal Terhubung ke Server";
+                resetScanner();
+            });
+        }
+
+        function resetScanner() {
+            setTimeout(() => {
+                const resultDiv = document.getElementById("result");
+                resultDiv.className = "scanning";
+                resultDiv.innerHTML = "Siap Memindai...";
+                isProcessing = false;
+            }, 3000);
+        }
+
+        function startScanner() {
+            const html5QrcodeScanner = new Html5QrcodeScanner(
+                "reader", 
+                { fps: 10, qrbox: { width: 250, height: 250 } }
+            );
+            html5QrcodeScanner.render(onScanSuccess);
+        }
+
+        window.addEventListener('load', startScanner);
+    </script>
+</body>
+</html>
