@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Absensi QR Realtime</title>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background-color: #121212; color: white; text-align: center; padding: 20px; }
+        #reader { width: 100%; max-width: 450px; margin: auto; border: 4px solid #3498db; border-radius: 15px; overflow: hidden; background: black; }
+        #result { margin-top: 20px; padding: 15px; border-radius: 10px; font-weight: bold; min-height: 50px; transition: 0.3s; }
+        .scanning { background: #2980b9; }
+        .success { background: #27ae60; animation: pulse 1s; }
+        .error { background: #c0392b; }
+        .processing { background: #f39c12; }
+        @keyframes pulse { 0% {transform: scale(1);} 50% {transform: scale(1.05);} 100% {transform: scale(1);} }
+    </style>
+</head>
+<body>
+    <h2>Scan QR Kehadiran</h2>
+    <div id="reader"></div>
+    <div id="result" class="scanning">Siap Memindai...</div>
+
+    <script>
+        // MASUKKAN URL GOOGLE APPS SCRIPT ANDA DI SINI
+        const SCRIPT_URL = "MASUKKAN_URL_DEPLOY_ANDA_DI_SINI"; 
+        let isProcessing = false;
+
+        function onScanSuccess(decodedText) {
+            if (isProcessing) return;
+            isProcessing = true;
+            
+            const resultDiv = document.getElementById("result");
+            const dataArray = decodedText.split(",");
+            const payload = { 
+                id: dataArray[0] ? dataArray[0].trim() : "N/A", 
+                nama: dataArray[1] ? dataArray[1].trim() : "Tanpa Nama" 
+            };
+
+            resultDiv.className = "processing";
+            resultDiv.innerHTML = `Mengirim data: ${payload.nama}...`;
+
+            fetch(SCRIPT_URL, {
+                method: "POST",
+                mode: "no-cors", 
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            })
+            .then(() => {
+                resultDiv.className = "success";
+                resultDiv.innerHTML = `✅ BERHASIL: ${payload.nama} tercatat!`;
+                resetScanner();
+            })
+            .catch(err => {
+                console.error("Fetch Error:", err);
+                resultDiv.className = "error";
+                resultDiv.innerHTML = "❌ Gagal Terhubung ke Server";
+                resetScanner();
+            });
+        }
+
+        function resetScanner() {
+            setTimeout(() => {
+                const resultDiv = document.getElementById("result");
+                resultDiv.className = "scanning";
+                resultDiv.innerHTML = "Siap Memindai...";
+                isProcessing = false;
+            }, 3000);
+        }
+
+        function startScanner() {
+            try {
+                // Nama class yang benar untuk menghindari ReferenceError
+                const html5QrcodeScanner = new Html5QrcodeScanner(
+                    "reader", 
+                    { fps: 15, qrbox: { width: 250, height: 250 } }
+                );
+                html5QrcodeScanner.render(onScanSuccess);
+            } catch (e) {
+                console.error("Gagal inisialisasi: ", e);
+                document.getElementById("result").innerHTML = "Gagal memuat kamera. Pastikan menggunakan HTTPS.";
+            }
+        }
+
+        window.addEventListener('load', startScanner);
+    </script>
+</body>
+</html>
